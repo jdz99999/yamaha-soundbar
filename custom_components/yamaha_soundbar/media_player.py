@@ -2693,8 +2693,11 @@ class YamahaDevice(MediaPlayerEntity):
                 await self.async_call_yamaha_httpapi(f"{cmd + sentence + end}", None)
                 await asyncio.sleep(0.1 * tentative)
                 status = await self.async_call_yamaha_httpapi("YAMAHA_DATA_GET", True)
-                if not isinstance(status, dict) or setting not in status:
-                    _LOGGER.debug("Setting '%s' is not available in YAMAHA_DATA_GET response", setting)
+                if not isinstance(status, dict):
+                    _LOGGER.debug("YAMAHA_DATA_GET returned invalid payload while checking '%s': %s", setting, status)
+                    break
+                if setting not in status:
+                    _LOGGER.debug("Setting '%s' is missing from YAMAHA_DATA_GET response", setting)
                     break
                 _LOGGER.debug("Received data: '%s: %s'", setting, status[setting])
                 if str(status[setting]) == value:
