@@ -608,6 +608,8 @@ class YamahaDevice(MediaPlayerEntity):
             sound_statdata = await self.async_call_yamaha_httpapi("YAMAHA_DATA_GET", True)
             if isinstance(sound_statdata, dict):
                 self._sound_statdata = sound_statdata
+            else:
+                self._sound_statdata = {}
             if self._first_update or (self._state == STATE_UNAVAILABLE or self._multiroom_wifidirect):
                 #_LOGGER.debug("03 Update first time getStatus %s, %s", self.entity_id, self._name)
                 device_status = await self.async_call_yamaha_httpapi("getStatusEx", True)
@@ -2709,7 +2711,7 @@ class YamahaDevice(MediaPlayerEntity):
                 status = await self.async_call_yamaha_httpapi("YAMAHA_DATA_GET", True)
                 if not isinstance(status, dict):
                     _LOGGER.debug("YAMAHA_DATA_GET returned invalid payload while checking '%s': %s", setting, status)
-                    break
+                    continue
                 if setting not in status:
                     _LOGGER.debug("Setting '%s' is missing from YAMAHA_DATA_GET response", setting)
                     break
