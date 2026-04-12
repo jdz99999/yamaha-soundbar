@@ -167,6 +167,20 @@ def _as_int_or_raw(value):
     except (TypeError, ValueError):
         return value
 
+
+def _normalize_sound_value(value):
+    if isinstance(value, bool):
+        return '1' if value else '0'
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        lowered = value.lower()
+        if lowered in ('on', 'true'):
+            return '1'
+        if lowered in ('off', 'false'):
+            return '0'
+    return str(value)
+
 SOURCES = {'bluetooth': 'Bluetooth',
            'optical': 'Optical',
            'HDMI': 'HDMI'}
@@ -2700,7 +2714,7 @@ class YamahaDevice(MediaPlayerEntity):
                     _LOGGER.debug("Setting '%s' is missing from YAMAHA_DATA_GET response", setting)
                     break
                 _LOGGER.debug("Received data: '%s: %s'", setting, status[setting])
-                if str(status[setting]) == value:
+                if _normalize_sound_value(status[setting]) == _normalize_sound_value(value):
                     break
                 _LOGGER.debug("Tentative %i to set '%s: %s' failed, value is %s", tentative,
                               setting, value, status[setting])

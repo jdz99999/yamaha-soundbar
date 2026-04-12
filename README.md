@@ -53,7 +53,7 @@ data:
 
 Set `clear_voice: false` to disable it.
 
-The integration now also exposes the current sound settings as media player attributes (`clear_voice`, `surround`, `bass_extension`, `subwoofer_volume`, `power_saving`, `sound_program`), so you can use them directly in template entities/automations.
+The integration also exposes the current sound settings as media player attributes (`clear_voice`, `surround`, `bass_extension`, `subwoofer_volume`, `power_saving`, `sound_program`), so you can use them directly in template entities/automations.
 
 ## Todo
 
