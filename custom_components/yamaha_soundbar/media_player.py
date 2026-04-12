@@ -609,6 +609,7 @@ class YamahaDevice(MediaPlayerEntity):
             if isinstance(sound_statdata, dict):
                 self._sound_statdata = sound_statdata
             else:
+                _LOGGER.debug("YAMAHA_DATA_GET returned invalid payload for %s: %s", self.entity_id, sound_statdata)
                 self._sound_statdata = {}
             if self._first_update or (self._state == STATE_UNAVAILABLE or self._multiroom_wifidirect):
                 #_LOGGER.debug("03 Update first time getStatus %s, %s", self.entity_id, self._name)
@@ -2704,6 +2705,7 @@ class YamahaDevice(MediaPlayerEntity):
 
         for sentence in sentences:
             setting, value = sentence.replace('%20', ' ').replace('%22', '').split(':')
+            expected_value = _normalize_sound_value(value)
             for tentative in range(10):
                 await self.async_call_yamaha_httpapi("YAMAHA_DATA_GET", True)
                 await self.async_call_yamaha_httpapi(f"{cmd + sentence + end}", None)
@@ -2716,7 +2718,7 @@ class YamahaDevice(MediaPlayerEntity):
                     _LOGGER.debug("Setting '%s' is missing from YAMAHA_DATA_GET response", setting)
                     break
                 _LOGGER.debug("Received data: '%s: %s'", setting, status[setting])
-                if _normalize_sound_value(status[setting]) == _normalize_sound_value(value):
+                if _normalize_sound_value(status[setting]) == expected_value:
                     break
                 _LOGGER.debug("Tentative %i to set '%s: %s' failed, value is %s", tentative,
                               setting, value, status[setting])
