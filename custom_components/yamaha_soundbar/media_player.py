@@ -2716,7 +2716,7 @@ class YamahaDevice(MediaPlayerEntity):
                     continue
                 if setting not in status:
                     _LOGGER.debug("Setting '%s' is missing from YAMAHA_DATA_GET response", setting)
-                    break
+                    continue
                 _LOGGER.debug("Received data: '%s: %s'", setting, status[setting])
                 if _normalize_sound_value(status[setting]) == expected_value:
                     break
