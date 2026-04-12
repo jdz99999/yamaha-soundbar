@@ -29,3 +29,18 @@ media_player:
         'bluetooth': 'Bluetooth',
       }
 ```
+
+### Toggle Clear Voice (including ATS-2090)
+
+Use the `yamaha_soundbar.sound_settings` service:
+
+```yaml
+action: yamaha_soundbar.sound_settings
+data:
+  entity_id: media_player.my_sound_bar
+  clear_voice: true
+```
+
+Set `clear_voice: false` to disable it.
+
+The integration also exposes current sound settings as media player attributes (`clear_voice`, `surround`, `bass_extension`, `subwoofer_volume`, `power_saving`, `sound_program`) for template entities/automations.
