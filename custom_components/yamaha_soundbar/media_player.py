@@ -150,7 +150,10 @@ SOUND_MODES = {'0': 'Normal', '1': 'Classic', '2': 'Pop', '3': 'Jazz', '4': 'Voc
 
 def _as_bool_or_raw(value):
     try:
-        return bool(int(value))
+        parsed_value = int(value)
+        if parsed_value in (0, 1):
+            return bool(parsed_value)
+        return value
     except (TypeError, ValueError):
         if isinstance(value, str):
             lowered = value.lower()
