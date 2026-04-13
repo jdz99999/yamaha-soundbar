@@ -134,6 +134,7 @@ TCPPORT = 8899
 UPNP_TIMEOUT = 2
 API_TIMEOUT = 2
 SCAN_INTERVAL = timedelta(seconds=3)
+SOUND_DATA_INTERVAL = timedelta(seconds=10)
 ICE_THROTTLE = timedelta(seconds=45)
 LFM_THROTTLE = timedelta(seconds=4)
 UNA_THROTTLE = timedelta(seconds=20)
@@ -391,6 +392,7 @@ class YamahaDevice(MediaPlayerEntity):
         self._nometa = False
         self._player_statdata = {}
         self._sound_statdata = {}
+        self._sound_statdata_updated_at = None
         self._lastfm_api_key = lastfm_api_key
         self._first_update = True
         self._slave_mode = False
@@ -555,6 +557,7 @@ class YamahaDevice(MediaPlayerEntity):
             self._slave_mode = False
             self._is_master = False
             self._player_statdata = None
+            self._sound_statdata_updated_at = None
             return
         self._player_statdata = resp.copy()
 
@@ -608,12 +611,18 @@ class YamahaDevice(MediaPlayerEntity):
 
         if isinstance(self._player_statdata, dict):
             self._unav_throttle = False
-            sound_statdata = await self.async_call_yamaha_httpapi("YAMAHA_DATA_GET", True)
-            if isinstance(sound_statdata, dict):
-                self._sound_statdata = sound_statdata
-            else:
-                _LOGGER.debug("YAMAHA_DATA_GET returned invalid payload for %s: %s", self.entity_id, sound_statdata)
-                self._sound_statdata = {}
+            should_refresh_sound_data = (
+                self._sound_statdata_updated_at is None
+                or utcnow() >= (self._sound_statdata_updated_at + SOUND_DATA_INTERVAL)
+            )
+            if should_refresh_sound_data:
+                sound_statdata = await self.async_call_yamaha_httpapi("YAMAHA_DATA_GET", True)
+                if isinstance(sound_statdata, dict):
+                    self._sound_statdata = sound_statdata
+                else:
+                    _LOGGER.debug("YAMAHA_DATA_GET returned invalid payload for %s: %s", self.entity_id, sound_statdata)
+                    self._sound_statdata = {}
+                self._sound_statdata_updated_at = utcnow()
             if self._first_update or (self._state == STATE_UNAVAILABLE or self._multiroom_wifidirect):
                 #_LOGGER.debug("03 Update first time getStatus %s, %s", self.entity_id, self._name)
                 device_status = await self.async_call_yamaha_httpapi("getStatusEx", True)
@@ -2717,6 +2726,8 @@ class YamahaDevice(MediaPlayerEntity):
                 if not isinstance(status, dict):
                     _LOGGER.debug("YAMAHA_DATA_GET returned invalid payload while checking '%s': %s", setting, status)
                     continue
+                self._sound_statdata = status
+                self._sound_statdata_updated_at = utcnow()
                 if setting not in status:
                     _LOGGER.debug("Setting '%s' is missing from YAMAHA_DATA_GET response", setting)
                     continue
