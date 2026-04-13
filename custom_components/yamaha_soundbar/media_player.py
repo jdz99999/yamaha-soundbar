@@ -557,6 +557,7 @@ class YamahaDevice(MediaPlayerEntity):
             self._slave_mode = False
             self._is_master = False
             self._player_statdata = None
+            self._sound_statdata = {}
             self._sound_statdata_updated_at = None
             return
         self._player_statdata = resp.copy()
@@ -613,7 +614,7 @@ class YamahaDevice(MediaPlayerEntity):
             self._unav_throttle = False
             should_refresh_sound_data = (
                 self._sound_statdata_updated_at is None
-                or utcnow() >= (self._sound_statdata_updated_at + SOUND_DATA_INTERVAL)
+                or utcnow() > (self._sound_statdata_updated_at + SOUND_DATA_INTERVAL)
             )
             if should_refresh_sound_data:
                 sound_statdata = await self.async_call_yamaha_httpapi("YAMAHA_DATA_GET", True)
