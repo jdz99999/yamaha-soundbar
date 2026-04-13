@@ -96,6 +96,12 @@ ATTR_SNAPSHOT = 'snapshot_active'
 ATTR_SNAPSPOT = 'snapshot_spotify'
 ATTR_DEBUG = 'debug_info'
 ATTR_MASS_POSITION = 'media_position_mass'
+ATTR_SOUND_PROGRAM = 'sound_program'
+ATTR_SUBWOOFER_VOLUME = 'subwoofer_volume'
+ATTR_SURROUND = 'surround'
+ATTR_CLEAR_VOICE = 'clear_voice'
+ATTR_BASS_EXTENSION = 'bass_extension'
+ATTR_POWER_SAVING = 'power_saving'
 
 CONF_NAME = 'name'
 CONF_SOURCE_IGNORE = "source_ignore"
@@ -128,6 +134,7 @@ TCPPORT = 8899
 UPNP_TIMEOUT = 2
 API_TIMEOUT = 2
 SCAN_INTERVAL = timedelta(seconds=3)
+SOUND_DATA_INTERVAL = timedelta(seconds=10)
 ICE_THROTTLE = timedelta(seconds=45)
 LFM_THROTTLE = timedelta(seconds=4)
 UNA_THROTTLE = timedelta(seconds=20)
@@ -140,6 +147,43 @@ AUTOIDLE_STATE_TIMEOUT = timedelta(seconds=2)
 CUT_EXTENSIONS = ['mp3', 'mp2', 'm2a', 'mpg', 'wav', 'aac', 'flac', 'flc', 'm4a', 'ape', 'wma', 'ac3', 'ogg']
 
 SOUND_MODES = {'0': 'Normal', '1': 'Classic', '2': 'Pop', '3': 'Jazz', '4': 'Vocal'}
+
+
+def _as_bool_or_raw(value):
+    try:
+        parsed_value = int(value)
+        if parsed_value in (0, 1):
+            return bool(parsed_value)
+        return value
+    except (TypeError, ValueError):
+        if isinstance(value, str):
+            lowered = value.lower()
+            if lowered in ('on', 'true'):
+                return True
+            if lowered in ('off', 'false'):
+                return False
+        return value
+
+
+def _as_int_or_raw(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return value
+
+
+def _normalize_sound_value(value):
+    if isinstance(value, bool):
+        return '1' if value else '0'
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        lowered = value.lower()
+        if lowered in ('on', 'true'):
+            return '1'
+        if lowered in ('off', 'false'):
+            return '0'
+    return str(value)
 
 SOURCES = {'bluetooth': 'Bluetooth',
            'optical': 'Optical',
@@ -347,6 +391,8 @@ class YamahaDevice(MediaPlayerEntity):
         self._media_source_uri = None
         self._nometa = False
         self._player_statdata = {}
+        self._sound_statdata = {}
+        self._sound_statdata_updated_at = None
         self._lastfm_api_key = lastfm_api_key
         self._first_update = True
         self._slave_mode = False
@@ -511,6 +557,8 @@ class YamahaDevice(MediaPlayerEntity):
             self._slave_mode = False
             self._is_master = False
             self._player_statdata = None
+            self._sound_statdata = {}
+            self._sound_statdata_updated_at = None
             return
         self._player_statdata = resp.copy()
 
@@ -564,6 +612,18 @@ class YamahaDevice(MediaPlayerEntity):
 
         if isinstance(self._player_statdata, dict):
             self._unav_throttle = False
+            should_refresh_sound_data = (
+                self._sound_statdata_updated_at is None
+                or utcnow() > (self._sound_statdata_updated_at + SOUND_DATA_INTERVAL)
+            )
+            if should_refresh_sound_data:
+                sound_statdata = await self.async_call_yamaha_httpapi("YAMAHA_DATA_GET", True)
+                if isinstance(sound_statdata, dict):
+                    self._sound_statdata = sound_statdata
+                else:
+                    _LOGGER.debug("YAMAHA_DATA_GET returned invalid payload for %s: %s", self.entity_id, sound_statdata)
+                    self._sound_statdata = {}
+                self._sound_statdata_updated_at = utcnow()
             if self._first_update or (self._state == STATE_UNAVAILABLE or self._multiroom_wifidirect):
                 #_LOGGER.debug("03 Update first time getStatus %s, %s", self.entity_id, self._name)
                 device_status = await self.async_call_yamaha_httpapi("getStatusEx", True)
@@ -1145,6 +1205,19 @@ class YamahaDevice(MediaPlayerEntity):
         attributes[ATTR_SNAPSPOT] = self._snap_spotify
 
         attributes[ATTR_MASS_POSITION] = self._mass_position
+        if isinstance(self._sound_statdata, dict):
+            if 'sound program' in self._sound_statdata:
+                attributes[ATTR_SOUND_PROGRAM] = self._sound_statdata['sound program']
+            if 'subwoofer volume' in self._sound_statdata:
+                attributes[ATTR_SUBWOOFER_VOLUME] = _as_int_or_raw(self._sound_statdata['subwoofer volume'])
+            if '3D surround' in self._sound_statdata:
+                attributes[ATTR_SURROUND] = _as_bool_or_raw(self._sound_statdata['3D surround'])
+            if 'clear voice' in self._sound_statdata:
+                attributes[ATTR_CLEAR_VOICE] = _as_bool_or_raw(self._sound_statdata['clear voice'])
+            if 'bass extension' in self._sound_statdata:
+                attributes[ATTR_BASS_EXTENSION] = _as_bool_or_raw(self._sound_statdata['bass extension'])
+            if 'power saving' in self._sound_statdata:
+                attributes[ATTR_POWER_SAVING] = _as_bool_or_raw(self._sound_statdata['power saving'])
 
         if DEBUGSTR_ATTR:
             atrdbg = ""
@@ -2645,13 +2718,22 @@ class YamahaDevice(MediaPlayerEntity):
 
         for sentence in sentences:
             setting, value = sentence.replace('%20', ' ').replace('%22', '').split(':')
+            expected_value = _normalize_sound_value(value)
             for tentative in range(10):
                 await self.async_call_yamaha_httpapi("YAMAHA_DATA_GET", True)
                 await self.async_call_yamaha_httpapi(f"{cmd + sentence + end}", None)
                 await asyncio.sleep(0.1 * tentative)
                 status = await self.async_call_yamaha_httpapi("YAMAHA_DATA_GET", True)
+                if not isinstance(status, dict):
+                    _LOGGER.debug("YAMAHA_DATA_GET returned invalid payload while checking '%s': %s", setting, status)
+                    continue
+                self._sound_statdata = status
+                self._sound_statdata_updated_at = utcnow()
+                if setting not in status:
+                    _LOGGER.debug("Setting '%s' is missing from YAMAHA_DATA_GET response", setting)
+                    continue
                 _LOGGER.debug("Received data: '%s: %s'", setting, status[setting])
-                if status[setting] == value:
+                if _normalize_sound_value(status[setting]) == expected_value:
                     break
                 _LOGGER.debug("Tentative %i to set '%s: %s' failed, value is %s", tentative,
                               setting, value, status[setting])

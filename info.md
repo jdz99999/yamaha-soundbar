@@ -29,3 +29,29 @@ media_player:
         'bluetooth': 'Bluetooth',
       }
 ```
+
+### Sound settings service
+
+Use `yamaha_soundbar.sound_settings` to set one or more sound options in a single call.
+
+Available fields:
+- `sound_program` (string)
+- `subwoofer_volume` (integer, -4 to 4)
+- `surround` (boolean)
+- `clear_voice` (boolean)
+- `bass_extension` (boolean)
+- `mute` (boolean)
+- `power_saving` (boolean)
+
+Example:
+
+```yaml
+action: yamaha_soundbar.sound_settings
+data:
+  entity_id: media_player.my_sound_bar
+  sound_program: movie
+  clear_voice: true
+  surround: true
+```
+
+Current sound settings are exposed as media player attributes (`clear_voice`, `surround`, `bass_extension`, `subwoofer_volume`, `power_saving`, `sound_program`) for template entities and automations.
