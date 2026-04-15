@@ -675,7 +675,10 @@ class YamahaDevice(MediaPlayerEntity):
                                 self._upnp_device = await self._factory.async_create_device(url)
                             except Exception as error:
                                 _LOGGER.warning(
-                                    "Failed communicating with Yamaha (UPnP) '%s': %s", self._name, type(error)
+                                    "Failed communicating with Yamaha (UPnP) '%s': %s (%s)",
+                                    self._name,
+                                    type(error).__name__,
+                                    error,
                                 )
 
                         if self._first_update:
