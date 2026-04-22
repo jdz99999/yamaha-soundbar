@@ -730,7 +730,7 @@ class YamahaDevice(MediaPlayerEntity):
             # }.get(self._player_statdata['status'], STATE_IDLE)
 
             if (self._player_statdata['mode'] in ['-1', '0'] or self._player_statdata['status'] == 'stop'):
-                if _as_bool_or_raw(self._sound_statdata.get('power saving')) is True:
+                if _as_bool_or_raw(self._sound_statdata.get('power saving')):
                     self._state = STATE_OFF
                 elif utcnow() >= (self._idletime_updated_at + AUTOIDLE_STATE_TIMEOUT):
                     self._state = STATE_IDLE
@@ -1751,19 +1751,16 @@ class YamahaDevice(MediaPlayerEntity):
             self._muted = bool(int(mute))
 
     async def async_turn_on(self):
-        """Turn the soundbar on using power-saving mode."""
+        """Turn the soundbar on by disabling power-saving mode."""
         await self.async_set_sound({"power_saving": False})
-        if self._state == STATE_OFF:
-            self._state = STATE_IDLE
 
     async def async_turn_off(self):
-        """Turn the soundbar off using power-saving mode."""
+        """Turn the soundbar off by enabling power-saving mode."""
         await self.async_set_sound({"power_saving": True})
-        self._state = STATE_OFF
 
     async def async_toggle(self):
         """Toggle power state."""
-        if self._state == STATE_OFF:
+        if _as_bool_or_raw(self._sound_statdata.get('power saving')) or self._state == STATE_OFF:
             await self.async_turn_on()
         else:
             await self.async_turn_off()
