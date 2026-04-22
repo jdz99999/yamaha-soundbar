@@ -66,6 +66,7 @@ from homeassistant.const import (
     CONF_HOST,
     CONF_NAME,
     CONF_PORT,
+    STATE_OFF,
     STATE_IDLE,
     STATE_PAUSED,
     STATE_PLAYING,
@@ -729,7 +730,9 @@ class YamahaDevice(MediaPlayerEntity):
             # }.get(self._player_statdata['status'], STATE_IDLE)
 
             if (self._player_statdata['mode'] in ['-1', '0'] or self._player_statdata['status'] == 'stop'):
-                if utcnow() >= (self._idletime_updated_at + AUTOIDLE_STATE_TIMEOUT):
+                if _as_bool_or_raw(self._sound_statdata.get('power saving')):
+                    self._state = STATE_OFF
+                elif utcnow() >= (self._idletime_updated_at + AUTOIDLE_STATE_TIMEOUT):
                     self._state = STATE_IDLE
                     self._media_uri_final = None
                     self._media_uri = None
@@ -1034,6 +1037,8 @@ class YamahaDevice(MediaPlayerEntity):
                     | MediaPlayerEntityFeature.SHUFFLE_SET 
                     | MediaPlayerEntityFeature.REPEAT_SET 
                     | MediaPlayerEntityFeature.SEEK
+                    | MediaPlayerEntityFeature.TURN_OFF
+                    | MediaPlayerEntityFeature.TURN_ON
                 )
             else:
                 self._features = (
@@ -1052,6 +1057,8 @@ class YamahaDevice(MediaPlayerEntity):
                     | MediaPlayerEntityFeature.PREVIOUS_TRACK 
                     | MediaPlayerEntityFeature.SHUFFLE_SET 
                     | MediaPlayerEntityFeature.REPEAT_SET
+                    | MediaPlayerEntityFeature.TURN_OFF
+                    | MediaPlayerEntityFeature.TURN_ON
                 )
 
         elif self._playing_stream or self._playing_mediabrowser:
@@ -1068,6 +1075,8 @@ class YamahaDevice(MediaPlayerEntity):
                 | MediaPlayerEntityFeature.PLAY 
                 | MediaPlayerEntityFeature.PAUSE
                 | MediaPlayerEntityFeature.SEEK
+                | MediaPlayerEntityFeature.TURN_OFF
+                | MediaPlayerEntityFeature.TURN_ON
                 )
 
         elif self._playing_liveinput:
@@ -1081,6 +1090,8 @@ class YamahaDevice(MediaPlayerEntity):
                 | MediaPlayerEntityFeature.VOLUME_STEP 
                 | MediaPlayerEntityFeature.VOLUME_MUTE 
                 | MediaPlayerEntityFeature.STOP
+                | MediaPlayerEntityFeature.TURN_OFF
+                | MediaPlayerEntityFeature.TURN_ON
                 )
 
         return self._features
@@ -1740,16 +1751,19 @@ class YamahaDevice(MediaPlayerEntity):
             self._muted = bool(int(mute))
 
     async def async_turn_on(self):
-        """Use Mune/Unmute instead, because power is not supported."""
-        await self.async_mute_volume(False)
+        """Turn the soundbar on by disabling power-saving mode."""
+        await self.async_set_sound({"power_saving": False})
 
     async def async_turn_off(self):
-        """Use Mune/Unmute instead, because power is not supported."""
-        await self.async_mute_volume(True)
+        """Turn the soundbar off by enabling power-saving mode."""
+        await self.async_set_sound({"power_saving": True})
 
     async def async_toggle(self):
-        """Use Mune/Unmute instead, because power is not supported."""
-        await self.async_mute_volume(not self._muted)
+        """Toggle power state."""
+        if _as_bool_or_raw(self._sound_statdata.get('power saving')) or self._state == STATE_OFF:
+            await self.async_turn_on()
+        else:
+            await self.async_turn_off()
 
     async def call_update_lastfm(self, cmd, params):
         """Update LastFM metadata."""
