@@ -1,0 +1,85 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add Yamaha Soundbar",
+        "description": "Enter the IP address of your Yamaha soundbar.",
+        "data": {
+          "host": "Host",
+          "name": "Name (optional, auto-detected from device)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the device. Check the IP address and make sure the soundbar is on.",
+      "invalid_auth": "Authentication failed while contacting the soundbar.",
+      "unknown": "Unexpected error"
+    },
+    "abort": {
+      "already_configured": "This device is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Yamaha Soundbar Options",
+        "data": {
+          "sources": "Sources (format: HDMI:TV, optical:Plexamp)",
+          "common_sources": "Common sources (format: key:name, ...)",
+          "source_ignore": "Ignored sources (comma-separated)",
+          "icecast_metadata": "Icecast metadata",
+          "multiroom_wifidirect": "Multiroom Wi-Fi Direct",
+          "led_off": "LED off",
+          "volume_step": "Volume step (1-25)",
+          "announce_volume_increase": "Announce volume increase (0-50)",
+          "lastfm_api_key": "Last.fm API key"
+        }
+      }
+    }
+  },
+  "services": {
+    "join": {
+      "name": "Join",
+      "description": "Group players together in a multiroom setup."
+    },
+    "unjoin": {
+      "name": "Unjoin",
+      "description": "Unjoin a player or all players from the multiroom setup."
+    },
+    "snapshot": {
+      "name": "Snapshot",
+      "description": "Save the current state to restore it later."
+    },
+    "restore": {
+      "name": "Restore",
+      "description": "Restore the previous state from a snapshot."
+    },
+    "preset": {
+      "name": "Preset",
+      "description": "Recall a preset on the device."
+    },
+    "command": {
+      "name": "Command",
+      "description": "Execute a low-level command on the device."
+    },
+    "play_track": {
+      "name": "Play track",
+      "description": "Play a track by name from the local track list."
+    },
+    "sound_settings": {
+      "name": "Sound settings",
+      "description": "Apply one or more sound settings."
+    }
+  },
+  "exceptions": {
+    "cannot_connect": {
+      "message": "Unable to connect to the soundbar."
+    },
+    "invalid_auth": {
+      "message": "Authentication failed when contacting the soundbar."
+    },
+    "unknown": {
+      "message": "Unexpected error while communicating with the soundbar."
+    }
+  }
+}

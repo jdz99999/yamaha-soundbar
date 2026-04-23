@@ -24,7 +24,18 @@ If you are upgrading from version 3.1.9 or earlier:
 #### 1. You will need to remove the old integration which is /custom_components/linkplay/ and then install the new integration.
 #### 2. You will need to update the platform configuration to `yamaha_soundbar` from `linkplay` in your `configuration.yaml` file.
 
-### Configuration
+## Configuration (UI)
+
+The recommended setup is via the Home Assistant UI:
+
+1. Settings → Devices & Services → Add Integration
+2. Search for "Yamaha Soundbar"
+3. Enter the IP address of your soundbar
+4. The device name is auto-detected; override only if you want a different label
+
+Source renaming, volume step, and other tunables are under the integration's "Configure" button after setup.
+
+## Configuration (YAML, legacy)
 
 ```yaml
 # Example configuration.yaml entry
@@ -66,11 +77,15 @@ data:
 
 Current sound settings are exposed as media player attributes (`clear_voice`, `surround`, `bass_extension`, `subwoofer_volume`, `power_saving`, `sound_program`) for template entities and automations.
 
-## Todo
+## Network
 
-1. Proper integration with config_flow
-2. Add on/off support
-3. Add other API features 
+Reserve a DHCP lease for your soundbar in your router. The integration uses the device's UUID as its unique ID, so a changed IP won't *break* the integration permanently — but it will go unavailable until Home Assistant rediscovers it. A static lease avoids that gap entirely.
+
+## Security note
+
+`custom_components/yamaha_soundbar/client.pem` is the Yamaha mTLS client certificate material used by this integration to authenticate requests to the soundbar. The original extraction/source is documented by the upstream maintainer in the osk2 post: <https://osk2.medium.com/%E6%88%91%E6%98%AF%E5%A6%82%E4%BD%95%E9%A7%AD%E9%80%B2%E6%88%91%E7%9A%84%E8%81%B2%E9%9C%B8-yas-209-6a05d74a574f>.
+
+Its control scope matches the official Yamaha Sound Bar Controller app behavior on the same LAN; anyone who can reach the soundbar and authenticate with the app-equivalent client material can issue control commands.
 
 ## License
 

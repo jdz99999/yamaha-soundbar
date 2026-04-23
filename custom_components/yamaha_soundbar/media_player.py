@@ -39,6 +39,8 @@ from homeassistant.helpers.aiohttp_client import (
     async_create_clientsession,
 )
 import homeassistant.helpers.config_validation as cv
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from homeassistant.components.media_player import (
     PLATFORM_SCHEMA,
@@ -74,7 +76,8 @@ from homeassistant.const import (
     STATE_UNAVAILABLE,
 )
 
-from . import DOMAIN, ATTR_MASTER
+from .const import DOMAIN, ATTR_MASTER
+from .api import YamahaClient, YamahaClientConfig
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -238,17 +241,12 @@ PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend(
     }
 )
 
-class YamahaData:
-    """Storage class for platform global data."""
-    def __init__(self):
-        """Initialize the data."""
-        self.entities = []
-
 async def async_setup_platform(hass, config, async_add_entities, discovery_info=None):
     """Set up the YamahaDevice platform."""
 
     if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = YamahaData()
+        hass.data[DOMAIN] = {}
+    hass.data[DOMAIN].setdefault("legacy_yaml", {"entities": []})
 
     name = config.get(CONF_NAME)
     host = config.get(CONF_HOST)
@@ -263,7 +261,7 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
     uuid = config.get(CONF_UUID)
 
     state = STATE_IDLE
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     initurl = "https://{0}/httpapi.asp?command=getStatusEx".format(host)
     dirname = os.path.dirname(__file__)
     certpath = os.path.join(dirname, CONF_CERT_FILENAME)
@@ -322,7 +320,95 @@ async def async_setup_platform(hass, config, async_add_entities, discovery_info=
                             uuid,
                             state,
                             hass)
+    yamaha._entry_id = "legacy_yaml"
 
+    async_add_entities([yamaha])
+
+
+async def async_setup_entry(
+    hass, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+) -> None:
+    """Set up Yamaha device from a config entry."""
+    hass.data.setdefault(DOMAIN, {})
+    hass.data[DOMAIN].setdefault(entry.entry_id, {"entities": []})
+    bucket = hass.data[DOMAIN][entry.entry_id]
+
+    host = entry.data[CONF_HOST]
+    name = entry.data.get(CONF_NAME, host)
+    uuid = entry.data.get(CONF_UUID, "")
+
+    if "client" not in bucket:
+        bucket["client"] = YamahaClient(
+            YamahaClientConfig(host=host, cert_dir=os.path.dirname(__file__))
+        )
+        _LOGGER.debug("YamahaClient ready for %s", host)
+
+    opts = entry.options
+    sources = opts.get(CONF_SOURCES)
+    common_sources = opts.get(CONF_COMMONSOURCES)
+    icecast_metadata = opts.get(CONF_ICECAST_METADATA, DEFAULT_ICECAST_UPDATE)
+    multiroom_wifidirect = opts.get(CONF_MULTIROOM_WIFIDIRECT, DEFAULT_MULTIROOM_WIFIDIRECT)
+    led_off = opts.get(CONF_LEDOFF, DEFAULT_LEDOFF)
+    volume_step = opts.get(CONF_VOLUME_STEP, DEFAULT_VOLUME_STEP)
+    announce_volume_increase = opts.get(CONF_ANNOUNCE_VOLUME_INCREASE, DEFAULT_ANNOUNCE_VOLUME_INCREASE)
+    lastfm_api_key = opts.get(CONF_LASTFM_API_KEY)
+
+    state = STATE_IDLE
+    loop = asyncio.get_running_loop()
+    initurl = "https://{0}/httpapi.asp?command=getStatusEx".format(host)
+    dirname = os.path.dirname(__file__)
+    certpath = os.path.join(dirname, CONF_CERT_FILENAME)
+    ssl_ctx = await loop.run_in_executor(None, ssl.create_default_context, ssl.Purpose.SERVER_AUTH)
+    await loop.run_in_executor(None, ssl_ctx.load_cert_chain, certpath)
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl.CERT_NONE
+    conn = aiohttp.TCPConnector(ssl_context=ssl_ctx)
+
+    try:
+        async with aiohttp.ClientSession(connector=conn) as websession:
+            response = await websession.get(initurl)
+            if response.status == HTTPStatus.OK:
+                data = await response.json(content_type=None)
+                _LOGGER.debug("HOST: %s DATA response: %s", host, data)
+
+                if not uuid:
+                    uuid = data.get("uuid", "")
+                if not name:
+                    name = data.get("DeviceName", host)
+            else:
+                _LOGGER.warning(
+                    "Get Status UUID failed, response code: %s Full message: %s",
+                    response.status,
+                    response,
+                )
+                state = STATE_UNAVAILABLE
+
+    except (asyncio.TimeoutError, aiohttp.ClientError) as error:
+        _LOGGER.warning(
+            "Failed communicating with YamahaDevice (start) '%s': uuid: %s %s",
+            host,
+            uuid,
+            type(error),
+        )
+        state = STATE_UNAVAILABLE
+
+    yamaha = YamahaDevice(
+        name,
+        host,
+        sources,
+        common_sources,
+        icecast_metadata,
+        multiroom_wifidirect,
+        led_off,
+        volume_step,
+        announce_volume_increase,
+        lastfm_api_key,
+        uuid,
+        state,
+        hass,
+    )
+    yamaha._entry = entry
+    yamaha._entry_id = entry.entry_id
     async_add_entities([yamaha])
 
 class YamahaDevice(MediaPlayerEntity):
@@ -437,13 +523,27 @@ class YamahaDevice(MediaPlayerEntity):
         self._snap_media_source_uri = None
         self._snap_seek = False
         self._snap_playhead_position = 0
+        self._entry_id = None
 
         # Listen for Music Assistant bus events
         hass.bus.async_listen("mass_event", self.handle_event)
 
     async def async_added_to_hass(self):
         """Record entity."""
-        self.hass.data[DOMAIN].entities.append(self)
+        if self._entry_id is not None:
+            self.hass.data[DOMAIN].setdefault(self._entry_id, {"entities": []})
+            self.hass.data[DOMAIN][self._entry_id]["entities"].append(self)
+        else:
+            self.hass.data[DOMAIN].setdefault("legacy_yaml", {"entities": []})
+            self.hass.data[DOMAIN]["legacy_yaml"]["entities"].append(self)
+
+    def _all_entities(self):
+        """Collect all Yamaha entities across entries."""
+        entities = []
+        for bucket in self.hass.data.get(DOMAIN, {}).values():
+            if isinstance(bucket, dict):
+                entities.extend(bucket.get("entities", []))
+        return entities
 
     def handle_event(self, event):
         """Retrieve events from Music Assistant through the event bus."""
@@ -461,7 +561,7 @@ class YamahaDevice(MediaPlayerEntity):
             timeout = API_TIMEOUT
 
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             dirname = os.path.dirname(__file__)
             certpath = os.path.join(dirname, CONF_CERT_FILENAME)
             ssl_ctx = await loop.run_in_executor(None, ssl.create_default_context, ssl.Purpose.SERVER_AUTH)
@@ -933,7 +1033,7 @@ class YamahaDevice(MediaPlayerEntity):
         """Return the name of the device."""
         if self._slave_mode:
             for dev in self._multiroom_group:
-                for device in self.hass.data[DOMAIN].entities:
+                for device in self._all_entities():
                     if device._is_master:
                         return self._name + ' [' + device._name + ']'
         else:
@@ -2317,7 +2417,7 @@ class YamahaDevice(MediaPlayerEntity):
 
     async def async_join_players(self, slaves):
         """Join `group_members` as a player group with the current player (standard HA)."""
-        entities = self.hass.data[DOMAIN].entities
+        entities = self._all_entities()
         entities = [e for e in entities if e.entity_id in slaves]
         await self.async_join(entities)
 
@@ -2393,7 +2493,7 @@ class YamahaDevice(MediaPlayerEntity):
         if value == "OK":
             self._is_master = False
             for slave_id in self._multiroom_group:
-                for device in self.hass.data[DOMAIN].entities:
+                for device in self._all_entities():
                     if device.entity_id == slave_id and device.entity_id != self.entity_id:
                         await device.async_set_slave_mode(False)
                         await device.async_set_is_master(False)
@@ -2421,7 +2521,7 @@ class YamahaDevice(MediaPlayerEntity):
         """Disconnect myself from the multiroom configuration."""
         if self._multiroom_wifidirect:
             for dev in self._multiroom_group:
-                for device in self.hass.data[DOMAIN].entities:
+                for device in self._all_entities():
                     if device._is_master:    ## TODO!!!
                         cmd = "multiroom:SlaveKickout:{0}".format(self._slave_ip)
                         value = await self._master.async_call_yamaha_httpapi(cmd, None)
@@ -2458,7 +2558,7 @@ class YamahaDevice(MediaPlayerEntity):
             self._slave_list = None
 
         for member in self._multiroom_group:
-            for player in self.hass.data[DOMAIN].entities:
+            for player in self._all_entities():
                 if player.entity_id == member and player.entity_id != self.entity_id:
                     await player.async_set_multiroom_group(self._multiroom_group)
 #                    await player.async_trigger_schedule_update(True)
