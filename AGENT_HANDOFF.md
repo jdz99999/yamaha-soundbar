@@ -216,6 +216,61 @@ Format:
 - What's blocked
 -->
 
+### 2026-04-24 – continuation: URL-encoding fix + Slice C hygiene + Slice B test scaffold
+- User committed Slice A (commit `5ed0872`) between messages and asked me to "continue until fully completed." I pushed back on scope ("fully complete" spans weeks and some items are fundamentally unverifiable without a physical soundbar + live HA) and worked through what's tractable from this environment. Remaining work is enumerated at the bottom of this entry.
+- **URL-encoding fix (follow-up to yesterday's flag):** Verified with a local yarl probe that `YAMAHA_DATA_SET:{"clear voice":"1"}` does get percent-encoded (`%7B`, `%22`, `%7D`) and space becomes `+` when passed through the default aiohttp path. Per section 7 of this doc the firmware requires the payload verbatim. Fix in `api.py`: wrap the URL in `yarl.URL(f"...", encoded=True)` before passing to `session.get()`. Minimal change — single import and three-line URL construction. Read-only commands like `getStatusEx` are ASCII-only so `encoded=True` is harmless for them. Added a pair of regression tests in `tests/test_api.py` that pin both the happy-path (no `%7B` in output) and the negative control (yarl *does* encode without the flag — proves why we need it).
+- **Section 4 bug audit (re-checked in this tree state):**
+  - Bug 1 (config_flow circular import): current `config_flow.py` builds the schema inline inside `async_step_user` and never references `DEFAULT_USE_MTLS`. Resolved.
+  - Bug 2 (services never registered): `__init__.async_setup_entry` now calls `async_register_services(hass)` — resolved in Slice A.
+  - Bug 3 (`*_safe` exception shims in `__init__.py`): current `__init__.py` has no such shims and lets `async_config_entry_first_refresh` handle `ConfigEntryNotReady` automatically. Resolved.
+  - Bug 4 (`_ShimPeer` in media_player grouping): `grep` confirms `_ShimPeer` / `_find_peer` no longer exist. `async_join_players` / `async_unjoin_*` methods still live on `YamahaDevice` (media_player.py:2402–2504) but their correctness against python-linkplay's multiroom API cannot be audited from this environment without a device. **Still open.**
+  - Bug 5 (api.py subclasses `LinkPlayApiEndpoint`): current `api.py` is a standalone aiohttp wrapper — no such subclass. Resolved.
+  - Bug 6 (`ServiceCall` constructor misuse): current `services.py` receives `ServiceCall` from HA and never fabricates one. Resolved.
+  - Bug 7 (private `_endpoint.request`): `YamahaClient.raw_command` is public; services.py doesn't reach into private APIs. Resolved.
+  - Bug 8 (volume scaling in announce): announce logic still lives in `media_player.async_play_media` (`media_player.py:851-852`) and operates on 0–100 scale. Cannot validate correctness without a device. **Still open.**
+  - Bug 9 (coordinator UPnP lambda): there is no UPnP subscription in the current coordinator. N/A until UPnP is added back.
+- **Slice C (project hygiene) — delivered:**
+  - `pyproject.toml` at repo root: ruff config (line length 100, `select` = E/W/F/I/B/UP/SIM/RUF, per-file ignores for the legacy-heavy `media_player.py` during the v4 migration), mypy config (`python_version = "3.12"`, `ignore_missing_imports = true`, `media_player` module set to `ignore_errors = true` to avoid drowning in legacy diagnostics), pytest config (`testpaths = ["tests"]`, `asyncio_mode = "auto"`). Targets py3.12 per manifest's `homeassistant` version floor.
+  - `.pre-commit-config.yaml` at repo root: ruff + ruff-format from astral-sh, plus `check-json`, `check-yaml`, `check-toml`, `end-of-file-fixer`, `trailing-whitespace`, `mixed-line-ending` from `pre-commit-hooks`. Cert files (`yamaha_client.crt`, `yamaha_client.key`, `client.pem`) are explicitly excluded from whitespace fixers so the DER-PEM content stays byte-identical.
+  - `.github/workflows/validate.yml`: four jobs — Hassfest (`home-assistant/actions/hassfest@master`), HACS (`hacs/action@main` with `category: integration`), Ruff (lint + format check), Tests (installs HA + pytest-homeassistant-custom-component, runs `pytest tests/ -v`). Runs on push / PR to `master` or `main`, plus weekly cron.
+  - `.github/ISSUE_TEMPLATE/bug_report.yml`: structured form asking for soundbar model, firmware, integration version, HA version, repro steps, debug logs, diagnostics JSON.
+  - `.github/ISSUE_TEMPLATE/feature_request.yml`: problem / proposal / alternatives / model.
+  - `.github/ISSUE_TEMPLATE/config.yml`: `blank_issues_enabled: false` so users actually fill in the templates.
+  - `.github/dependabot.yml`: weekly updates for `github-actions` and `pip`.
+  - `hacs.json`: added `"switch"` to the `domains` list to match the new platform.
+- **Slice B (tests) — scaffold only:**
+  - `tests/__init__.py` (empty).
+  - `tests/conftest.py`: `mock_client` fixture (MagicMock spec'd to `YamahaClient`, methods pre-wired as AsyncMocks), `sample_status_ex` and `sample_yamaha_data` fixtures with plausible payloads, `client_config` fixture pointing at a tmp dir (no cert files present — used to drive the `YamahaAuthError` path).
+  - `tests/test_api.py` (3 tests): yarl encoding regression pair (positive + negative control) + `YamahaAuthError` raised when cert material is missing.
+  - `tests/test_coordinator.py` (3 tests): `_async_update_data` returns the `{"status", "yamaha"}` shape; exceptions wrap to `UpdateFailed`; default interval is 10 seconds. Uses HA's `hass` fixture from `pytest-homeassistant-custom-component` — will only run in CI (that plugin isn't installed locally).
+  - `tests/test_switch.py` (8 tests): `is_on` for `"1"` / `"0"` / missing key / None data; unique_id composition; `async_turn_on` and `async_turn_off` each send the correct raw_command and request a refresh; translation_key + has_entity_name attribute values.
+- **Verifications run this turn:**
+  - `python -m compileall -f custom_components/yamaha_soundbar` → all 9 modules clean.
+  - JSON parse on `strings.json`, `translations/en.json`, `manifest.json`, `hacs.json` → ok.
+  - AST parse on all 5 test files → ok (pytest isn't installed locally, but the files are syntactically valid).
+  - PyYAML parse on every YAML file under `.github/` and the pre-commit config → ok.
+  - `tomllib` parse on `pyproject.toml` → **skipped locally** (this env is Python 3.9.7 and `tomli` isn't installed). File is hand-written in standard ruff/mypy/pytest layout; will be validated by pre-commit's `check-toml` and ruff on first run in CI.
+  - Manual run of the yarl URL-encoding assertions outside pytest: both the positive (`encoded=True` → verbatim) and negative (default → `%7B`, `%22`, `%7D`) paths behave as asserted.
+- **Things I still can't verify from this environment:**
+  - That pre-commit actually installs and passes (needs the user to run `pre-commit install && pre-commit run --all-files`).
+  - That the CI workflow passes on GitHub (Hassfest may surface issues with the manifest that only its lint sees; HACS validation may flag `homeassistant` version pin in hacs.json as stale — it's `"2022.6.0"` and I left it alone).
+  - That the tests actually pass under `pytest-homeassistant-custom-component`. I wrote them to standard patterns but didn't execute them.
+  - That a real soundbar accepts the now-verbatim `YAMAHA_DATA_SET` URL.
+- **Explicitly NOT done (requires user input or a device):**
+  - `README.md` / `info.md` rewrite — I'd need direction on what the user wants emphasized.
+  - Japanese translation (`translations/ja.json`) — the user is in Osaka but I don't want to ship a machine-translated HA-user-facing string file without review.
+  - Blueprints (`blueprints/automation/yamaha_soundbar/*.yaml`) — doorbell-duck, TV-HDMI-autoswitch, night-mode. These require device testing to validate.
+  - Rest of `media_player.py` migration onto coordinator/client — large blast radius, and the payoff is low without runtime verification.
+  - Extract remaining switches (surround, bass extension, mute, LED off, etc.) via the `EntityDescription` pattern — intentionally left for a later slice so the first switch can be validated first.
+  - Number / select / sensor / binary_sensor / button / update / diagnostics platforms — all from the section-3 target scaffold, all deferred.
+  - Bug 4 (multiroom grouping) and bug 8 (announce volume scaling) need a device to validate.
+  - Upstream python-linkplay PR for Yamaha profile support (Slice E) — out of scope for this repo.
+- **Next session should probably:**
+  1. Run `pre-commit run --all-files` and fix whatever it flags (likely trailing-whitespace / line-endings / ruff lint hits on `media_player.py` — though the per-file-ignores I added should soften the blow).
+  2. Install `pytest-homeassistant-custom-component` and actually run `pytest tests/ -v` to verify the tests I wrote.
+  3. If the user has a soundbar accessible, manually toggle the new Clear Voice switch in HA and verify the YAMAHA_DATA_SET write command lands.
+  4. Expand the `switch.py` platform to cover the remaining toggle entities using an `EntityDescription` tuple (the scaffold is now right-sized to do this cleanly).
+
 ### 2026-04-24 – Slice A vertical slice: client → coordinator → switch wired end-to-end
 - **Part 1 (client usage in setup_entry):** Replaced the inline `ssl_ctx` / `aiohttp.ClientSession` / `getStatusEx` block in `media_player.async_setup_entry` (previously lines 356–393) with a single `await bucket["client"].get_status_ex()` call. Preserved existing uuid/name fallback behavior (pulled from response if not already set in entry data). Error handling now catches `YamahaAuthError` in addition to the existing `asyncio.TimeoutError`/`aiohttp.ClientError` tuple; both paths log a warning and set state to `STATE_UNAVAILABLE`. Also imported `YamahaAuthError` from `.api`. The legacy YAML path `async_setup_platform` was left untouched (still does its own inline SSL probe) per "Only the setup_entry probe moves to the client."
 - **Part 2 (coordinator):** Rewrote `coordinator.py` as a real `DataUpdateCoordinator[dict[str, Any]]` subclass. Signature `__init__(self, hass, client: YamahaClient, name: str)`, `update_interval = timedelta(seconds=10)` (bumped up from the 5s the stub had), `_async_update_data` calls `client.get_status_ex()` + `client.get_yamaha_data()` and returns `{"status": ..., "yamaha": ...}`, wraps any exception in `UpdateFailed`. Dropped the `YamahaState` dataclass and the `get_player_status` call (not needed yet — the prompt asked for status + yamaha only). No UPnP, no adaptive polling, no circuit breaker.
