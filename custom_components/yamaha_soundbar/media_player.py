@@ -77,7 +77,7 @@ from homeassistant.const import (
 )
 
 from .const import DOMAIN, ATTR_MASTER
-from .api import YamahaClient, YamahaClientConfig
+from .api import YamahaAuthError, YamahaClient, YamahaClientConfig
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -354,35 +354,19 @@ async def async_setup_entry(
     lastfm_api_key = opts.get(CONF_LASTFM_API_KEY)
 
     state = STATE_IDLE
-    loop = asyncio.get_running_loop()
-    initurl = "https://{0}/httpapi.asp?command=getStatusEx".format(host)
-    dirname = os.path.dirname(__file__)
-    certpath = os.path.join(dirname, CONF_CERT_FILENAME)
-    ssl_ctx = await loop.run_in_executor(None, ssl.create_default_context, ssl.Purpose.SERVER_AUTH)
-    await loop.run_in_executor(None, ssl_ctx.load_cert_chain, certpath)
-    ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode = ssl.CERT_NONE
-    conn = aiohttp.TCPConnector(ssl_context=ssl_ctx)
-
+    client = bucket["client"]
     try:
-        async with aiohttp.ClientSession(connector=conn) as websession:
-            response = await websession.get(initurl)
-            if response.status == HTTPStatus.OK:
-                data = await response.json(content_type=None)
-                _LOGGER.debug("HOST: %s DATA response: %s", host, data)
-
-                if not uuid:
-                    uuid = data.get("uuid", "")
-                if not name:
-                    name = data.get("DeviceName", host)
-            else:
-                _LOGGER.warning(
-                    "Get Status UUID failed, response code: %s Full message: %s",
-                    response.status,
-                    response,
-                )
-                state = STATE_UNAVAILABLE
-
+        data = await client.get_status_ex()
+        _LOGGER.debug("HOST: %s DATA response: %s", host, data)
+        if not uuid:
+            uuid = data.get("uuid", "")
+        if not name:
+            name = data.get("DeviceName", host)
+    except YamahaAuthError as error:
+        _LOGGER.warning(
+            "Yamaha client auth failed for '%s': %s", host, error
+        )
+        state = STATE_UNAVAILABLE
     except (asyncio.TimeoutError, aiohttp.ClientError) as error:
         _LOGGER.warning(
             "Failed communicating with YamahaDevice (start) '%s': uuid: %s %s",

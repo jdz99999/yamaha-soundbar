@@ -37,6 +37,13 @@
       }
     }
   },
+  "entity": {
+    "switch": {
+      "clear_voice": {
+        "name": "Clear Voice"
+      }
+    }
+  },
   "services": {
     "join": {
       "name": "Join",

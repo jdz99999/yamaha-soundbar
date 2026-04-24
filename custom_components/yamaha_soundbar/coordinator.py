@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import timedelta
 import logging
 from typing import Any
@@ -11,35 +10,28 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import YamahaClient
-from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
+
+DEFAULT_UPDATE_INTERVAL = timedelta(seconds=10)
 
 
-@dataclass(slots=True)
-class YamahaState:
-    """Normalized state model used by entities."""
-
-    status: dict[str, Any]
-    player: dict[str, Any]
-    yamaha: dict[str, Any]
-
-
-class YamahaCoordinator(DataUpdateCoordinator[YamahaState]):
+class YamahaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     """Poll Yamaha state from a single API client."""
 
-    def __init__(self, hass: HomeAssistant, client: YamahaClient) -> None:
+    def __init__(self, hass: HomeAssistant, client: YamahaClient, name: str) -> None:
         super().__init__(
             hass,
-            logger=logging.getLogger(__name__),
-            name=f"{DOMAIN}_coordinator",
-            update_interval=timedelta(seconds=5),
+            logger=_LOGGER,
+            name=name,
+            update_interval=DEFAULT_UPDATE_INTERVAL,
         )
         self.client = client
 
-    async def _async_update_data(self) -> YamahaState:
+    async def _async_update_data(self) -> dict[str, Any]:
         try:
             status = await self.client.get_status_ex()
-            player = await self.client.get_player_status()
             yamaha = await self.client.get_yamaha_data()
-            return YamahaState(status=status, player=player, yamaha=yamaha)
-        except Exception as err:  # pragma: no cover - HA coordinator pattern
+        except Exception as err:
             raise UpdateFailed(f"Failed to update Yamaha state: {err}") from err
+        return {"status": status, "yamaha": yamaha}

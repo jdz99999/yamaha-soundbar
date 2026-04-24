@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python -m compileall custom_components/yamaha_soundbar)"
+      "Bash(python -m compileall custom_components/yamaha_soundbar)",
+      "Bash(python *)",
+      "Bash(ruff --version)"
     ]
   }
 }

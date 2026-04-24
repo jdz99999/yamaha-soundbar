@@ -7,7 +7,7 @@ def signal_device_updated(entry_id: str) -> str:
     return f"{DOMAIN}_device_updated_{entry_id}"
 
 
-PLATFORMS = ["media_player"]
+PLATFORMS = ["media_player", "switch"]
 
 SERVICE_JOIN = "join"
 SERVICE_UNJOIN = "unjoin"
