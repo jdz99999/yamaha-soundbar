@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
-from homeassistant.components.switch import SwitchEntity
+from homeassistant.components.switch import SwitchEntity, SwitchEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
@@ -12,6 +13,77 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from .const import CONF_UUID, DOMAIN
 from .coordinator import YamahaCoordinator
 from .entity import YamahaCoordinatorEntity
+
+
+@dataclass(frozen=True, kw_only=True)
+class YamahaSwitchDescription(SwitchEntityDescription):
+    """Describes a Yamaha toggleable feature."""
+
+    api_key: str
+
+
+SWITCHES: tuple[YamahaSwitchDescription, ...] = (
+    YamahaSwitchDescription(
+        key="clear_voice",
+        translation_key="clear_voice",
+        api_key="clear voice",
+        icon="mdi:account-voice",
+    ),
+    YamahaSwitchDescription(
+        key="surround_3d",
+        translation_key="surround_3d",
+        api_key="3D surround",
+        icon="mdi:surround-sound",
+    ),
+    YamahaSwitchDescription(
+        key="bass_extension",
+        translation_key="bass_extension",
+        api_key="bass extension",
+        icon="mdi:speaker",
+    ),
+    YamahaSwitchDescription(
+        key="voice_control",
+        translation_key="voice_control",
+        api_key="voice control",
+        icon="mdi:microphone",
+    ),
+    YamahaSwitchDescription(
+        key="power_saving",
+        translation_key="power_saving",
+        api_key="power saving",
+        icon="mdi:leaf",
+    ),
+    YamahaSwitchDescription(
+        key="auto_power_stby",
+        translation_key="auto_power_stby",
+        api_key="Auto Power Stby",
+        icon="mdi:timer-off",
+    ),
+    YamahaSwitchDescription(
+        key="hdmi_control",
+        translation_key="hdmi_control",
+        api_key="HDMI Control",
+        icon="mdi:hdmi-port",
+    ),
+    YamahaSwitchDescription(
+        key="net_standby",
+        translation_key="net_standby",
+        api_key="NET Standby",
+        icon="mdi:wifi",
+        entity_registry_enabled_default=False,
+    ),
+)
+
+
+def _build_set_payload(api_key: str, value: str) -> str:
+    """Build the half-encoded YAMAHA_DATA_SET payload.
+
+    Quotes are %22, spaces %20; braces, colon, and the value itself stay literal.
+    Verified against YAS-209 firmware — fully-encoded and fully-literal forms both
+    return HTTP 400 from the device's parser.
+    """
+    encoded_key = api_key.replace(" ", "%20")
+    return f"YAMAHA_DATA_SET:{{%22{encoded_key}%22:%22{value}%22}}"
 
 
 async def async_setup_entry(
@@ -23,36 +95,43 @@ async def async_setup_entry(
     bucket = hass.data[DOMAIN][entry.entry_id]
     coordinator: YamahaCoordinator = bucket["coordinator"]
     uuid = entry.data.get(CONF_UUID) or entry.entry_id
-    async_add_entities([ClearVoiceSwitch(coordinator, uuid)])
+    async_add_entities(
+        YamahaSwitch(coordinator, uuid, description) for description in SWITCHES
+    )
 
 
-class ClearVoiceSwitch(YamahaCoordinatorEntity, SwitchEntity):
-    """Toggle the soundbar's Clear Voice enhancement."""
+class YamahaSwitch(YamahaCoordinatorEntity, SwitchEntity):
+    """A single toggleable Yamaha feature backed by YAMAHA_DATA_GET/SET."""
 
-    _attr_has_entity_name = True
-    _attr_translation_key = "clear_voice"
+    entity_description: YamahaSwitchDescription
 
-    def __init__(self, coordinator: YamahaCoordinator, uuid: str) -> None:
+    def __init__(
+        self,
+        coordinator: YamahaCoordinator,
+        uuid: str,
+        description: YamahaSwitchDescription,
+    ) -> None:
         super().__init__(coordinator)
-        self._attr_unique_id = f"{uuid}_clear_voice"
+        self.entity_description = description
+        self._attr_unique_id = f"{uuid}_{description.key}"
 
     @property
     def is_on(self) -> bool | None:
         data = self.coordinator.data or {}
         yamaha = data.get("yamaha") or {}
-        raw = yamaha.get("clear voice")
+        raw = yamaha.get(self.entity_description.api_key)
         if raw is None:
             return None
         return str(raw) == "1"
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self.coordinator.client.raw_command(
-            'YAMAHA_DATA_SET:{%22clear%20voice%22:%221%22}'
+            _build_set_payload(self.entity_description.api_key, "1")
         )
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.coordinator.client.raw_command(
-            'YAMAHA_DATA_SET:{%22clear%20voice%22:%220%22}'
+            _build_set_payload(self.entity_description.api_key, "0")
         )
         await self.coordinator.async_request_refresh()

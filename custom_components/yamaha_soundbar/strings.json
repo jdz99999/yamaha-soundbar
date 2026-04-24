@@ -41,6 +41,27 @@
     "switch": {
       "clear_voice": {
         "name": "Clear Voice"
+      },
+      "surround_3d": {
+        "name": "3D Surround"
+      },
+      "bass_extension": {
+        "name": "Bass Extension"
+      },
+      "voice_control": {
+        "name": "Voice Control"
+      },
+      "power_saving": {
+        "name": "Power Saving"
+      },
+      "auto_power_stby": {
+        "name": "Auto Power Standby"
+      },
+      "hdmi_control": {
+        "name": "HDMI Control"
+      },
+      "net_standby": {
+        "name": "Net Standby"
       }
     }
   },
