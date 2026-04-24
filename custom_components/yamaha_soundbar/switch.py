@@ -47,12 +47,12 @@ class ClearVoiceSwitch(YamahaCoordinatorEntity, SwitchEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         await self.coordinator.client.raw_command(
-            'YAMAHA_DATA_SET:{"clear voice":"1"}'
+            'YAMAHA_DATA_SET:{%22clear%20voice%22:%221%22}'
         )
         await self.coordinator.async_request_refresh()
 
     async def async_turn_off(self, **kwargs: Any) -> None:
         await self.coordinator.client.raw_command(
-            'YAMAHA_DATA_SET:{"clear voice":"0"}'
+            'YAMAHA_DATA_SET:{%22clear%20voice%22:%220%22}'
         )
         await self.coordinator.async_request_refresh()
