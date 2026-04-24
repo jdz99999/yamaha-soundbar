@@ -172,6 +172,8 @@ pytest tests/ -v
 - Lowercase MAC before `CONNECTION_NETWORK_MAC`.
 - Recommend DHCP reservation in README.
 
+YAMAHA_DATA_SET requires a half-encoded payload. Quotes as %22, spaces as %20, but {, }, :, and scalar values left literal. Example: YAMAHA_DATA_SET:{%22clear%20voice%22:%221%22}. Fully-encoded URLs and verbatim-with-literal-quotes URLs both produce HTTP 400 "malformed request" from the device's parser. Verified against YAS-209 firmware on 2026-04-24. The api._request method uses yarl.URL(..., encoded=True) to pass through the pre-encoded string without re-encoding — do not remove that.
+
 ---
 
 ## 8. Roadmap, prioritised
@@ -330,3 +332,5 @@ Format:
 - Scaffold landed with known bugs enumerated in section 4.
 - Partial: Python modules + services.yaml + manifest.json. Missing: strings/translations/tests/CI/docs/blueprints.
 - Next session: fix the 9 bugs, write strings.json + translations/en.json, get hassfest passing locally. Don't add features until the thing loads cleanly in HA.
+
+
