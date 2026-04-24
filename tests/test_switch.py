@@ -58,7 +58,7 @@ async def test_clear_voice_turn_on_sends_raw_command(mock_client) -> None:
 
     mock_client.raw_command.assert_awaited_once()
     call_args = mock_client.raw_command.await_args.args[0]
-    assert call_args == 'YAMAHA_DATA_SET:{"clear voice":"1"}'
+    assert call_args == 'YAMAHA_DATA_SET:{%22clear%20voice%22:%221%22}'
     coord.async_request_refresh.assert_awaited_once()
 
 
@@ -71,7 +71,7 @@ async def test_clear_voice_turn_off_sends_raw_command(mock_client) -> None:
 
     mock_client.raw_command.assert_awaited_once()
     call_args = mock_client.raw_command.await_args.args[0]
-    assert call_args == 'YAMAHA_DATA_SET:{"clear voice":"0"}'
+    assert call_args == 'YAMAHA_DATA_SET:{%22clear%20voice%22:%220%22}'
     coord.async_request_refresh.assert_awaited_once()
 
 
