@@ -11,6 +11,7 @@ from http import HTTPStatus
 from typing import Any
 
 import aiohttp
+from yarl import URL
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -73,7 +74,12 @@ class YamahaClient:
 
     async def _request(self, command: str, expect_json: bool = False) -> Any:
         session = await self._ensure_session()
-        url = f"https://{self._config.host}/httpapi.asp?command={command}"
+        # Yamaha firmware requires YAMAHA_DATA_SET payloads verbatim.
+        # yarl would otherwise percent-encode '{', '}', '"' and turn space into '+'.
+        url = URL(
+            f"https://{self._config.host}/httpapi.asp?command={command}",
+            encoded=True,
+        )
         async with session.get(url) as response:
             if response.status != HTTPStatus.OK:
                 raise aiohttp.ClientError(f"Unexpected status code {response.status}")
