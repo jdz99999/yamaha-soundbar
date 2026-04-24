@@ -1,0 +1,64 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = [
+    "custom_components/yamaha_soundbar/yamaha_client.crt",
+    "custom_components/yamaha_soundbar/yamaha_client.key",
+    "custom_components/yamaha_soundbar/client.pem",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "E501",   # line-length handled by formatter
+    "B008",   # voluptuous schemas legitimately call in defaults
+    "SIM108", # ternaries aren't always clearer
+]
+
+[tool.ruff.lint.per-file-ignores]
+"custom_components/yamaha_soundbar/media_player.py" = [
+    "E401",  # legacy multi-import lines during v4 migration
+    "E741",  # single-letter vars in legacy code
+    "F401",  # legacy unused imports during migration
+    "F841",  # legacy unused locals during migration
+    "B007",  # unused loop variable in legacy code
+]
+"tests/**/*.py" = [
+    "B017",  # tests intentionally assert on broad exceptions
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["custom_components.yamaha_soundbar"]
+combine-as-imports = true
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+follow_imports = "silent"
+ignore_missing_imports = true
+strict_optional = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+files = ["custom_components/yamaha_soundbar"]
+
+[[tool.mypy.overrides]]
+module = "custom_components.yamaha_soundbar.media_player"
+ignore_errors = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+asyncio_mode = "auto"

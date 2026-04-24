@@ -2,6 +2,6 @@
   "name": "Yamaha Soundbar",
   "content_in_root": false,
   "render_readme": false,
-  "domains": ["media_player"],
+  "domains": ["media_player", "switch"],
   "homeassistant": "2022.6.0"
 }

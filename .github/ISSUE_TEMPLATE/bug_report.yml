@@ -1,0 +1,82 @@
+name: Bug report
+description: Report a problem with the Yamaha Soundbar integration.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Before submitting, please:
+        - Make sure you're on the latest release of this integration.
+        - Check the existing issues for duplicates.
+        - Attach the integration's diagnostics dump if possible (Settings → Devices → Yamaha Soundbar → three-dot menu → "Download diagnostics").
+
+  - type: input
+    id: device_model
+    attributes:
+      label: Soundbar model
+      description: e.g. YAS-209, ATS-2090, SR-X40A
+      placeholder: "YAS-209"
+    validations:
+      required: true
+
+  - type: input
+    id: firmware
+    attributes:
+      label: Soundbar firmware version
+      placeholder: "4.6.xxxxxx"
+    validations:
+      required: false
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      placeholder: "4.0.0-alpha.1"
+    validations:
+      required: true
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+      placeholder: "2024.12.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Home Assistant logs
+      description: |
+        Set `custom_components.yamaha_soundbar: debug` under `logger:` in configuration.yaml, reproduce, and paste the resulting log lines here.
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics attachment
+      description: Paste the contents of the diagnostics JSON file here, or attach it to the issue.
+      render: json
+    validations:
+      required: false

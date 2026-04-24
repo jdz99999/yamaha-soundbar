@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest a new feature or improvement.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the user pain point or missing capability.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: How should the integration behave? UI, service, entity, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or other approaches you evaluated?
+    validations:
+      required: false
+
+  - type: input
+    id: device_model
+    attributes:
+      label: Soundbar model (if applicable)
+      placeholder: "YAS-209"
+    validations:
+      required: false
