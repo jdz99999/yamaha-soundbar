@@ -67,6 +67,14 @@
     "select": {
       "input_source": {
         "name": "Input Source"
+      },
+      "sound_program": {
+        "name": "Sound Program"
+      }
+    },
+    "number": {
+      "subwoofer_volume": {
+        "name": "Subwoofer Volume"
       }
     }
   },

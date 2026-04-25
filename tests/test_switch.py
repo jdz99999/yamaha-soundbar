@@ -6,11 +6,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from custom_components.yamaha_soundbar._yamaha_codec import _build_set_payload
 from custom_components.yamaha_soundbar.coordinator import YamahaCoordinator
 from custom_components.yamaha_soundbar.switch import (
     SWITCHES,
     YamahaSwitch,
-    _build_set_payload,
 )
 
 

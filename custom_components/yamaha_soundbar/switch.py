@@ -10,6 +10,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+from ._yamaha_codec import _build_set_payload
 from .const import CONF_UUID, DOMAIN
 from .coordinator import YamahaCoordinator
 from .entity import YamahaCoordinatorEntity
@@ -73,17 +74,6 @@ SWITCHES: tuple[YamahaSwitchDescription, ...] = (
         entity_registry_enabled_default=False,
     ),
 )
-
-
-def _build_set_payload(api_key: str, value: str) -> str:
-    """Build the half-encoded YAMAHA_DATA_SET payload.
-
-    Quotes are %22, spaces %20; braces, colon, and the value itself stay literal.
-    Verified against YAS-209 firmware — fully-encoded and fully-literal forms both
-    return HTTP 400 from the device's parser.
-    """
-    encoded_key = api_key.replace(" ", "%20")
-    return f"YAMAHA_DATA_SET:{{%22{encoded_key}%22:%22{value}%22}}"
 
 
 async def async_setup_entry(
