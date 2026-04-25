@@ -10,8 +10,10 @@ from homeassistant.helpers.entity import EntityCategory
 
 from custom_components.yamaha_soundbar.coordinator import YamahaCoordinator
 from custom_components.yamaha_soundbar.sensor import (
+    PLAYER_MAPPED_SENSORS,
     STATUS_SENSORS,
     YAMAHA_SENSORS,
+    YamahaPlayerMappedSensor,
     YamahaStatusSensor,
     YamahaYamahaSensor,
 )
@@ -224,3 +226,114 @@ def test_rssi_has_entity_name(rssi_description, mock_client) -> None:
     entity = YamahaStatusSensor(coord, "uuid", rssi_description)
     assert entity._attr_has_entity_name is True
     assert entity.entity_description.translation_key == "rssi"
+
+
+# ---------------------------------------------------------------------------
+# Player mapped sensor (input_mode)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def input_mode_description():
+    return next(d for d in PLAYER_MAPPED_SENSORS if d.key == "input_mode")
+
+
+def test_one_player_mapped_sensor_is_registered() -> None:
+    assert len(PLAYER_MAPPED_SENSORS) == 1
+    assert PLAYER_MAPPED_SENSORS[0].key == "input_mode"
+
+
+def test_input_mode_options_match_yas209_probe(input_mode_description) -> None:
+    """Pin the four labels exactly — these must stay in sync with select.py."""
+    assert input_mode_description.options == ["Bluetooth", "TV", "HDMI", "Net"]
+    assert input_mode_description.read_field == "mode"
+
+
+def test_input_mode_device_class_is_enum(input_mode_description) -> None:
+    assert input_mode_description.device_class == SensorDeviceClass.ENUM
+
+
+def test_input_mode_mode_map_pinned(input_mode_description) -> None:
+    """Lock the 4 mode_int → label mappings against accidental edits."""
+    assert input_mode_description.mode_map == {
+        41: "Bluetooth",
+        43: "TV",
+        49: "HDMI",
+        31: "Net",
+    }
+
+
+@pytest.mark.parametrize(
+    ("raw_mode", "expected_label"),
+    [
+        ("41", "Bluetooth"),
+        ("43", "TV"),
+        ("49", "HDMI"),
+        ("31", "Net"),
+        (41, "Bluetooth"),
+        (43, "TV"),
+        (49, "HDMI"),
+        (31, "Net"),
+    ],
+)
+def test_input_mode_native_value_for_known_modes(
+    raw_mode, expected_label, input_mode_description, mock_client
+) -> None:
+    coord = _coordinator_with({"player": {"mode": raw_mode}}, mock_client)
+    entity = YamahaPlayerMappedSensor(coord, "uuid", input_mode_description)
+    assert entity.native_value == expected_label
+
+
+def test_input_mode_native_value_none_for_unknown_int(
+    input_mode_description, mock_client
+) -> None:
+    coord = _coordinator_with({"player": {"mode": "99"}}, mock_client)
+    entity = YamahaPlayerMappedSensor(coord, "uuid", input_mode_description)
+    assert entity.native_value is None
+
+
+def test_input_mode_native_value_none_for_unparsable(
+    input_mode_description, mock_client
+) -> None:
+    coord = _coordinator_with(
+        {"player": {"mode": "not a number"}}, mock_client
+    )
+    entity = YamahaPlayerMappedSensor(coord, "uuid", input_mode_description)
+    assert entity.native_value is None
+
+
+def test_input_mode_native_value_none_when_mode_key_missing(
+    input_mode_description, mock_client
+) -> None:
+    coord = _coordinator_with({"player": {"vol": "50"}}, mock_client)
+    entity = YamahaPlayerMappedSensor(coord, "uuid", input_mode_description)
+    assert entity.native_value is None
+
+
+def test_input_mode_native_value_none_when_player_missing(
+    input_mode_description, mock_client
+) -> None:
+    coord = _coordinator_with({}, mock_client)
+    entity = YamahaPlayerMappedSensor(coord, "uuid", input_mode_description)
+    assert entity.native_value is None
+
+
+def test_input_mode_native_value_none_when_data_none(
+    input_mode_description, mock_client
+) -> None:
+    coord = _coordinator_with(None, mock_client)
+    entity = YamahaPlayerMappedSensor(coord, "uuid", input_mode_description)
+    assert entity.native_value is None
+
+
+def test_input_mode_unique_id(input_mode_description, mock_client) -> None:
+    coord = _coordinator_with({"player": {}}, mock_client)
+    entity = YamahaPlayerMappedSensor(coord, "uuid-XYZ", input_mode_description)
+    assert entity.unique_id == "uuid-XYZ_input_mode"
+
+
+def test_input_mode_translation_key(input_mode_description, mock_client) -> None:
+    coord = _coordinator_with({"player": {}}, mock_client)
+    entity = YamahaPlayerMappedSensor(coord, "uuid", input_mode_description)
+    assert entity._attr_has_entity_name is True
+    assert entity.entity_description.translation_key == "input_mode"

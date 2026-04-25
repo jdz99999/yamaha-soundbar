@@ -52,6 +52,22 @@ class YamahaStatusSensorDescription(SensorEntityDescription):
     read_field: str
 
 
+@dataclass(frozen=True, kw_only=True)
+class YamahaPlayerMappedSensorDescription(SensorEntityDescription):
+    """Player-side integer field mapped through a label dict.
+
+    NOTE: the mode_map for input_mode is intentionally duplicated between
+    select.py (which uses (label, set_verb) tuples for read+write) and this
+    file (which uses just labels for read-only). The shapes differ enough
+    that abstracting them out would cost more than it saves. If a new mode
+    integer is added, it MUST be added in BOTH select.py's SELECTS entry
+    and the PLAYER_MAPPED_SENSORS entry below.
+    """
+
+    read_field: str
+    mode_map: dict[int, str]
+
+
 YAMAHA_SENSORS: tuple[YamahaYamahaSensorDescription, ...] = (
     YamahaYamahaSensorDescription(
         key="audio_stream",
@@ -119,6 +135,27 @@ STATUS_SENSORS: tuple[YamahaStatusSensorDescription, ...] = (
 )
 
 
+# IMPORTANT: input_mode's mode_map below duplicates the read side of
+# select.py's input_source mode_map (which also has set verbs). If a new
+# mode integer ever needs to be supported, add it BOTH here and there.
+PLAYER_MAPPED_SENSORS: tuple[YamahaPlayerMappedSensorDescription, ...] = (
+    YamahaPlayerMappedSensorDescription(
+        key="input_mode",
+        translation_key="input_mode",
+        icon="mdi:video-input-hdmi",
+        read_field="mode",
+        mode_map={
+            41: "Bluetooth",
+            43: "TV",
+            49: "HDMI",
+            31: "Net",
+        },
+        device_class=SensorDeviceClass.ENUM,
+        options=["Bluetooth", "TV", "HDMI", "Net"],
+    ),
+)
+
+
 async def async_setup_entry(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -138,6 +175,10 @@ async def async_setup_entry(
     )
     entities.extend(
         YamahaStatusSensor(coordinator, uuid, d) for d in STATUS_SENSORS
+    )
+    entities.extend(
+        YamahaPlayerMappedSensor(coordinator, uuid, d)
+        for d in PLAYER_MAPPED_SENSORS
     )
     async_add_entities(entities)
 
@@ -209,3 +250,27 @@ class YamahaStatusSensor(_YamahaSensorBase):
             except (TypeError, ValueError):
                 return None
         return str(raw)
+
+
+class YamahaPlayerMappedSensor(_YamahaSensorBase):
+    """A player-side int field exposed as a labeled ENUM sensor.
+
+    Duplicates the read side of select.py's input source for users who want
+    to trigger automations on input changes — sensor state changes are easier
+    to subscribe to than poking at a select entity's current_option attribute.
+    """
+
+    entity_description: YamahaPlayerMappedSensorDescription
+
+    @property
+    def native_value(self) -> str | None:
+        data = self.coordinator.data or {}
+        player = data.get("player") or {}
+        raw = player.get(self.entity_description.read_field)
+        if raw is None:
+            return None
+        try:
+            mode_int = int(raw)
+        except (TypeError, ValueError):
+            return None
+        return self.entity_description.mode_map.get(mode_int)
