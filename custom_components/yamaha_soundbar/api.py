@@ -112,3 +112,11 @@ class YamahaClient:
         """Execute raw command string and return response body."""
         response = await self._request(cmd, expect_json=False)
         return response.strip()
+
+    async def set_player_cmd(self, subcommand: str) -> str:
+        """Send a setPlayerCmd:<subcommand> request.
+
+        These are plain commands (no half-encoding) per the Linkplay HTTP API.
+        Examples: switchmode:wifi, vol:30, pause, play, next.
+        """
+        return await self.raw_command(f"setPlayerCmd:{subcommand}")

@@ -11,19 +11,23 @@ from custom_components.yamaha_soundbar.coordinator import YamahaCoordinator
 
 
 @pytest.mark.asyncio
-async def test_coordinator_merges_status_and_yamaha_payloads(
+async def test_coordinator_merges_status_player_and_yamaha_payloads(
     hass, mock_client, sample_status_ex, sample_yamaha_data
 ) -> None:
-    """_async_update_data should return {'status': ..., 'yamaha': ...}."""
+    """_async_update_data should return {'status': ..., 'player': ..., 'yamaha': ...}."""
+    sample_player_status = {"mode": "31", "status": "play", "vol": "30"}
     mock_client.get_status_ex.return_value = sample_status_ex
+    mock_client.get_player_status.return_value = sample_player_status
     mock_client.get_yamaha_data.return_value = sample_yamaha_data
 
     coordinator = YamahaCoordinator(hass, mock_client, name="test")
     data = await coordinator._async_update_data()
 
     assert data["status"] == sample_status_ex
+    assert data["player"] == sample_player_status
     assert data["yamaha"] == sample_yamaha_data
     assert mock_client.get_status_ex.await_count == 1
+    assert mock_client.get_player_status.await_count == 1
     assert mock_client.get_yamaha_data.await_count == 1
 
 

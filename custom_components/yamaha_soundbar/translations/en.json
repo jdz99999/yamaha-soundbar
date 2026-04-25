@@ -63,6 +63,11 @@
       "net_standby": {
         "name": "Net Standby"
       }
+    },
+    "select": {
+      "input_source": {
+        "name": "Input Source"
+      }
     }
   },
   "services": {

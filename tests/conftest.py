@@ -21,6 +21,7 @@ def mock_client() -> Generator[MagicMock, None, None]:
     client.get_player_status = AsyncMock()
     client.get_yamaha_data = AsyncMock()
     client.raw_command = AsyncMock(return_value="OK")
+    client.set_player_cmd = AsyncMock(return_value="OK")
     client.close = AsyncMock()
     yield client
 

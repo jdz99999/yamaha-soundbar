@@ -31,7 +31,8 @@ class YamahaCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_update_data(self) -> dict[str, Any]:
         try:
             status = await self.client.get_status_ex()
+            player = await self.client.get_player_status()
             yamaha = await self.client.get_yamaha_data()
         except Exception as err:
             raise UpdateFailed(f"Failed to update Yamaha state: {err}") from err
-        return {"status": status, "yamaha": yamaha}
+        return {"status": status, "player": player, "yamaha": yamaha}
