@@ -1,57 +1,11 @@
 # Yamaha Soundbar
 
-This component allows you to control Yamaha soundbar.
+A Home Assistant integration for Yamaha soundbars built on the Linkplay A118 module. Connects over the bar's HTTPS API with mutual TLS, polls every 10 seconds, and exposes the soundbar as a media player plus a curated set of switches, selects, numbers, and diagnostic sensors. Setup is UI-only — no YAML.
 
-Tested on Yamaha YAS-109 & YAS-209, any Yamaha soundbar based on Linkplay A118 should be supported as well. (These include ATS-1090, ATS-2090, SR-X40A, SR-X50A, ATS-X500, Please make an issue in Github if you have a different model and it's not working, or even better if it is, so we can update the compatibility list.)
+Verified on YAS-209. Expected to work (unverified) on YAS-109, ATS-1090, ATS-2090, SR-X40A, SR-X50A, and ATS-X500 — all share the same A118 module. Input mode codes are model-specific and may differ; please open an issue if your bar reports something different.
 
-## Installation
+Entities exposed: 1 media player, 8 switches (Clear Voice, 3D Surround, Bass Extension, Voice Control, Power Saving, Auto Power Standby, HDMI Control, Net Standby), 2 selects (Input Source, Sound Program), 2 numbers (Volume, Subwoofer Volume), and 8 sensors (Audio Stream, Wi-Fi Signal, Input Mode, plus 5 firmware diagnostic sensors). Net Standby and the firmware sensors are disabled by default.
 
-#### 1. Install custom component
- - Using HACS
- - Install manually: copy all files in `custom_components/yamha_soundbar` to your `<config directory>/custom_components/yamaha_soundbar/` directory.
+To install: add this repository to HACS as a custom integration repository, install Yamaha Soundbar, restart Home Assistant, then add the integration via Settings → Devices & Services → Add Integration → Yamaha Soundbar and enter the bar's IP address.
 
-#### 2. Restart Home-Assistant.
-#### 3. Add the configuration to your configuration.yaml.
-#### 4. Restart Home-Assistant again.
-
-### Configuration
-
-```yaml
-# Example configuration.yaml entry
-media_player:
-  - platform: yamaha_soundbar
-    host: 192.168.1.11
-    name: My Sound Bar # To name your sources (optional)
-    sources:
-      {
-        'HDMI': 'TV', 
-        'optical': 'Plexamp', 
-        'bluetooth': 'Bluetooth',
-      }
-```
-
-### Sound settings service
-
-Use `yamaha_soundbar.sound_settings` to set one or more sound options in a single call.
-
-Available fields:
-- `sound_program` (string)
-- `subwoofer_volume` (integer, -4 to 4)
-- `surround` (boolean)
-- `clear_voice` (boolean)
-- `bass_extension` (boolean)
-- `mute` (boolean)
-- `power_saving` (boolean)
-
-Example:
-
-```yaml
-action: yamaha_soundbar.sound_settings
-data:
-  entity_id: media_player.my_sound_bar
-  sound_program: movie
-  clear_voice: true
-  surround: true
-```
-
-Current sound settings are exposed as media player attributes (`clear_voice`, `surround`, `bass_extension`, `subwoofer_volume`, `power_saving`, `sound_program`) for template entities and automations.
+See the [README](README.md) for the full entity reference, upgrading instructions from v3.x and the legacy `linkplay` integration, known limitations (including the dimmer caveat), troubleshooting, and the security note about the bundled mTLS client certificate.
