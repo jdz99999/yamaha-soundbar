@@ -75,6 +75,32 @@
     "number": {
       "subwoofer_volume": {
         "name": "Subwoofer Volume"
+      },
+      "volume": {
+        "name": "Volume"
+      }
+    },
+    "sensor": {
+      "audio_stream": {
+        "name": "Audio Stream"
+      },
+      "rssi": {
+        "name": "Wi-Fi Signal"
+      },
+      "firmware_system": {
+        "name": "System Firmware"
+      },
+      "firmware_a118": {
+        "name": "A118 Firmware"
+      },
+      "firmware_mcu": {
+        "name": "MCU Firmware"
+      },
+      "firmware_dsp": {
+        "name": "DSP Firmware"
+      },
+      "firmware_hdmi": {
+        "name": "HDMI Firmware"
       }
     }
   },

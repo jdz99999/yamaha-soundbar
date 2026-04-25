@@ -26,6 +26,19 @@ class YamahaNumberDescription(NumberEntityDescription):
     api_key: str
 
 
+@dataclass(frozen=True, kw_only=True)
+class YamahaPlayerNumberDescription(NumberEntityDescription):
+    """A number backed by setPlayerCmd reads/writes (Linkplay-side state).
+
+    Mirrors how select.py separates the YAMAHA_DATA_GET/SET path
+    (YamahaSoundProgramDescription) from the setPlayerCmd path
+    (YamahaSelectDescription) — same architectural split, applied to numbers.
+    """
+
+    read_field: str
+    set_subcommand: str
+
+
 NUMBERS: tuple[YamahaNumberDescription, ...] = (
     YamahaNumberDescription(
         key="subwoofer_volume",
@@ -34,6 +47,21 @@ NUMBERS: tuple[YamahaNumberDescription, ...] = (
         api_key="subwoofer volume",
         native_min_value=-4,
         native_max_value=4,
+        native_step=1,
+        mode=NumberMode.SLIDER,
+    ),
+)
+
+
+PLAYER_NUMBERS: tuple[YamahaPlayerNumberDescription, ...] = (
+    YamahaPlayerNumberDescription(
+        key="volume",
+        translation_key="volume",
+        icon="mdi:volume-high",
+        read_field="vol",
+        set_subcommand="vol",
+        native_min_value=0,
+        native_max_value=100,
         native_step=1,
         mode=NumberMode.SLIDER,
     ),
@@ -49,9 +77,14 @@ async def async_setup_entry(
     bucket = hass.data[DOMAIN][entry.entry_id]
     coordinator: YamahaCoordinator = bucket["coordinator"]
     uuid = entry.data.get(CONF_UUID) or entry.entry_id
-    async_add_entities(
+    entities: list[NumberEntity] = [
         YamahaNumber(coordinator, uuid, description) for description in NUMBERS
+    ]
+    entities.extend(
+        YamahaPlayerNumber(coordinator, uuid, description)
+        for description in PLAYER_NUMBERS
     )
+    async_add_entities(entities)
 
 
 class YamahaNumber(YamahaCoordinatorEntity, NumberEntity):
@@ -92,5 +125,52 @@ class YamahaNumber(YamahaCoordinatorEntity, NumberEntity):
         )
         await self.coordinator.client.raw_command(
             _build_set_payload(self.entity_description.api_key, str(clamped))
+        )
+        await self.coordinator.async_request_refresh()
+
+
+class YamahaPlayerNumber(YamahaCoordinatorEntity, NumberEntity):
+    """A setPlayerCmd-backed integer setting (volume, ...).
+
+    Reads from coordinator.data["player"][read_field], writes via
+    client.set_player_cmd(f"{set_subcommand}:{int_value}").
+
+    Note (firmware behavior, not enforced here): on YAS-209, sending vol:0
+    auto-mutes the bar; vol:>0 auto-unmutes. The existing media_player entity
+    owns mute state — we deliberately do NOT couple a mute toggle here to
+    avoid competing entities racing on the same underlying state.
+    """
+
+    entity_description: YamahaPlayerNumberDescription
+
+    def __init__(
+        self,
+        coordinator: YamahaCoordinator,
+        uuid: str,
+        description: YamahaPlayerNumberDescription,
+    ) -> None:
+        super().__init__(coordinator)
+        self.entity_description = description
+        self._attr_unique_id = f"{uuid}_{description.key}"
+
+    @property
+    def native_value(self) -> int | None:
+        data = self.coordinator.data or {}
+        player = data.get("player") or {}
+        raw = player.get(self.entity_description.read_field)
+        if raw is None:
+            return None
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
+
+    async def async_set_native_value(self, value: float) -> None:
+        clamped = max(
+            int(self.entity_description.native_min_value),
+            min(int(self.entity_description.native_max_value), int(value)),
+        )
+        await self.coordinator.client.set_player_cmd(
+            f"{self.entity_description.set_subcommand}:{clamped}"
         )
         await self.coordinator.async_request_refresh()
